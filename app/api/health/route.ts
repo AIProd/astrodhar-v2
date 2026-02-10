@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:8000';
+import { getBackendUrl } from "@/lib/config";
+
+const PYTHON_API_URL = getBackendUrl();
 
 export async function GET() {
     try {

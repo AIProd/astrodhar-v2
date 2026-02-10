@@ -3,6 +3,10 @@ import { AdviceRequest, AdviceResponse } from "@/lib/types";
 import { generateAdvice } from "@/lib/mock";
 import { checkSafety } from "@/lib/safety";
 
+import { getBackendUrl } from "@/lib/config";
+
+const PYTHON_API_URL = getBackendUrl();
+
 const DISCLAIMERS = [
     "This is for entertainment and spiritual guidance purposes only.",
     "Not a substitute for professional counseling or medical advice.",

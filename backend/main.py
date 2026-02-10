@@ -30,12 +30,17 @@ app = FastAPI(
     title="AstroDhar API",
     description="Vedic astrology calculations and relationship compatibility indicators",
     version="2.0.0",
+    docs_url="/api/py/docs",
+    openapi_url="/api/py/openapi.json",
 )
+
+# Create a router for all endpoints with the prefix
+router = APIRouter(prefix="/api/py")
 
 # CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "https://astrodhar.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,7 +80,7 @@ def _to_birth_input(req: BirthInputRequest) -> BirthInput:
     )
 
 
-@app.get("/health")
+@router.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {
@@ -86,7 +91,7 @@ async def health_check():
     }
 
 
-@app.post("/chart")
+@router.post("/chart")
 async def calculate_chart(req: ChartRequest):
     """Calculate a single Vedic birth chart."""
     try:
@@ -126,7 +131,7 @@ async def calculate_chart(req: ChartRequest):
         raise HTTPException(status_code=500, detail=f"Chart calculation failed: {str(e)}")
 
 
-@app.post("/compatibility")
+@router.post("/compatibility")
 async def calculate_compatibility(req: CompatibilityRequest):
     """Calculate compatibility indicators and Guna matching between two charts."""
     try:
@@ -188,7 +193,7 @@ class CompatibilityChatRequest(BaseModel):
     history: List[Dict[str, str]] = []
 
 
-@app.post("/chat/chart")
+@router.post("/chat/chart")
 async def chat_chart(req: ChartChatRequest):
     """Chat about a birth chart using LLM."""
     try:
@@ -204,7 +209,7 @@ async def chat_chart(req: ChartChatRequest):
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
-@app.post("/chat/compatibility")
+@router.post("/chat/compatibility")
 async def chat_compatibility(req: CompatibilityChatRequest):
     """Chat about compatibility using LLM."""
     try:
@@ -217,7 +222,7 @@ async def chat_compatibility(req: CompatibilityChatRequest):
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
-@app.post("/insights/chart")
+@router.post("/insights/chart")
 async def generate_chart_insights_endpoint(req: ChartRequest):
     """Generate LLM insights for a chart."""
     try:
@@ -238,7 +243,7 @@ async def generate_chart_insights_endpoint(req: ChartRequest):
         raise HTTPException(status_code=500, detail=f"Insights generation failed: {str(e)}")
 
 
-@app.post("/insights/compatibility")
+@router.post("/insights/compatibility")
 async def generate_compatibility_insights_endpoint(req: CompatibilityRequest):
     """Generate LLM insights for compatibility."""
     try:
@@ -271,6 +276,10 @@ async def generate_compatibility_insights_endpoint(req: CompatibilityRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insights generation failed: {str(e)}")
+
+
+# Include the router
+app.include_router(router)
 
 
 if __name__ == "__main__":

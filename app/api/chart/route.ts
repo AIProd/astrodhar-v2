@@ -8,20 +8,40 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
 
-        const response = await fetch(`${PYTHON_API_URL}/chart`, {
+        const headers = getForwardHeaders(request);
+        const url = `${PYTHON_API_URL}/chart`;
+
+        console.log(`[Proxy] Fetching ${url}`);
+        console.log(`[Proxy] Headers:`, JSON.stringify(headers));
+
+        const response = await fetch(url, {
             method: "POST",
-            headers: getForwardHeaders(request),
+            headers: headers,
             body: JSON.stringify(body),
+            redirect: "manual", // Prevent following redirects (e.g. to login page)
         });
 
-        const data = await response.json();
+        console.log(`[Proxy] Response status: ${response.status}`);
 
         if (!response.ok) {
+            // Handle redirects explicitly
+            if (response.status >= 300 && response.status < 400) {
+                return NextResponse.json(
+                    { error: `Backend redirected to ${response.headers.get("location")}` },
+                    { status: response.status }
+                );
+            }
+
+            const errorText = await response.text();
+            console.error(`[Proxy] Error text: ${errorText.substring(0, 200)}...`); // Log first 200 chars
+
             return NextResponse.json(
-                { error: data.detail || "Chart calculation failed" },
+                { error: `Backend error (${response.status}): ${errorText}` },
                 { status: response.status }
             );
         }
+
+        const data = await response.json();
 
         return NextResponse.json(data);
     } catch (error) {

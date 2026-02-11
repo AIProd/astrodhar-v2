@@ -99,11 +99,30 @@ export default function MatchPage() {
             });
 
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.detail || data.error || "Insights generation failed");
+                const text = await res.text();
+                console.error("Insights API Error:", res.status, text);
+                let errorMessage = "Insights generation failed";
+                try {
+                    const data = JSON.parse(text);
+                    errorMessage = data.detail || data.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server Error (${res.status}): ${text.slice(0, 100)}`;
+                }
+                throw new Error(errorMessage);
             }
 
-            const data = await res.json();
+            const text = await res.text();
+            if (!text) {
+                throw new Error("Empty response from server");
+            }
+
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error("JSON Parse Error:", e, "Raw text:", text.slice(0, 200));
+                throw new Error("Invalid response format from server");
+            }
 
             // Merge the new insights into the existing result
             setResult(prev => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getBackendUrl } from "@/lib/config";
+import { getBackendUrl, getForwardHeaders } from "@/lib/config";
 
 const PYTHON_API_URL = getBackendUrl();
 
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
         const response = await fetch(`${PYTHON_API_URL}/chat/compatibility`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getForwardHeaders(request),
             body: JSON.stringify(body),
         });
 

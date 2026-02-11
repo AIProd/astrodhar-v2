@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VedicChart } from "@/lib/types";
 
-import { getBackendUrl } from "@/lib/config";
+import { getBackendUrl, getForwardHeaders } from "@/lib/config";
 
 const PYTHON_API_URL = getBackendUrl();
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         // Call Python backend LLM
         const response = await fetch(`${PYTHON_API_URL}/chat/chart`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getForwardHeaders(request),
             body: JSON.stringify({
                 chart: chart,
                 question: question,

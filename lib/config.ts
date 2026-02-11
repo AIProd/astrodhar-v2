@@ -23,3 +23,28 @@ export function getBackendUrl() {
     // Local development fallback
     return envUrl || "http://localhost:8000/api/py";
 }
+
+import { NextRequest } from "next/server";
+
+export function getForwardHeaders(request: NextRequest) {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+
+    // Forward auth/protection headers
+    const keysToForward = [
+        "cookie",
+        "authorization",
+        "x-vercel-protection-bypass",
+        "x-vercel-auth"
+    ];
+
+    keysToForward.forEach(key => {
+        const val = request.headers.get(key);
+        if (val) {
+            headers[key] = val;
+        }
+    });
+
+    return headers;
+}

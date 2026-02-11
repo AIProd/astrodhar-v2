@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getBackendUrl } from "@/lib/config";
+import { getBackendUrl, getForwardHeaders } from "@/lib/config";
 
 const PYTHON_API_URL = getBackendUrl();
 
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         // Forward to Python backend
         const response = await fetch(`${PYTHON_API_URL}/compatibility`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getForwardHeaders(req),
             body: JSON.stringify(body),
         });
 

@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-import { getBackendUrl } from "@/lib/config";
+import { getBackendUrl, getForwardHeaders } from "@/lib/config";
 
 const PYTHON_API_URL = getBackendUrl();
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         // Check Python backend health
-        const response = await fetch(`${PYTHON_API_URL}/health`);
+        const response = await fetch(`${PYTHON_API_URL}/health`, {
+            headers: getForwardHeaders(request as any), // health GET doesn't usually have request object strictly typed in Next.js GET handler without args? 
+            // Wait, GET handler in Next.js App Router: export async function GET(request: NextRequest)
+        });
 
         if (response.ok) {
             const pythonHealth = await response.json();

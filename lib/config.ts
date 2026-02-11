@@ -33,7 +33,6 @@ export function getForwardHeaders(request: NextRequest) {
 
     // Forward auth/protection headers
     const keysToForward = [
-        "cookie",
         "authorization",
         "x-vercel-protection-bypass",
         "x-vercel-auth"
@@ -45,6 +44,20 @@ export function getForwardHeaders(request: NextRequest) {
             headers[key] = val;
         }
     });
+
+    // Explicitly reconstruct Cookie header from request.cookies
+    // This is more robust than request.headers.get("cookie") in some Next.js environments
+    const cookies = request.cookies.getAll();
+    if (cookies.length > 0) {
+        const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+        headers["cookie"] = cookieHeader;
+    } else {
+        // Fallback to header if cookies API is empty (though unlikely if header exists)
+        const headerCookie = request.headers.get("cookie");
+        if (headerCookie) {
+            headers["cookie"] = headerCookie;
+        }
+    }
 
     return headers;
 }

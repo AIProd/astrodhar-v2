@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple, Any
 from dataclasses import dataclass, asdict
 
-from schemas import VedicChart
+from .schemas import VedicChart
 
 
 @dataclass(frozen=True)

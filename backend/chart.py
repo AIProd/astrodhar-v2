@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import swisseph as swe
 
-from schemas import BirthInput, PlanetPosition, Ascendant, VedicChart
+from .schemas import BirthInput, PlanetPosition, Ascendant, VedicChart
 
 
 SIGNS = [

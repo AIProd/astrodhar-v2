@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BirthInputCard } from "@/components/BirthInputCard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { DimensionCard } from "@/components/DimensionCard";
@@ -9,6 +9,7 @@ import { ChartCard } from "@/components/ChartCard";
 import { GunaCard } from "@/components/GunaCard";
 import { MatchChat } from "@/components/MatchChat";
 import { CosmicInsights } from "@/components/CosmicInsights";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { BirthInput, CompatibilityResponse } from "@/lib/types";
 
 const defaultBirth = (): BirthInput => ({
@@ -26,13 +27,12 @@ export default function MatchPage() {
     const [partnerB, setPartnerB] = useState<BirthInput>(defaultBirth());
     const [result, setResult] = useState<CompatibilityResponse | null>(null);
     const [loading, setLoading] = useState(false);
+    const [insightsLoading, setInsightsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showCharts, setShowCharts] = useState(false);
 
-    // New state for accordion and deferred insights
-    const [activeSection, setActiveSection] = useState<string | null>("guna");
-    const [insightsStage, setInsightsStage] = useState<"initial" | "loading" | "loaded">("initial");
-    const [insightsError, setInsightsError] = useState<string | null>(null);
+    // Accordion state: "scores", "analysis", "guidance", or null
+    const [openSection, setOpenSection] = useState<string | null>("scores");
 
     const isValid = (b: BirthInput) =>
         b.name.trim() && b.date && b.time && b.lat !== 0 && b.lon !== 0;
@@ -47,14 +47,18 @@ export default function MatchPage() {
 
         setLoading(true);
         setError(null);
-        setResult(null);
-        setInsightsStage("initial"); // Reset AI stage
+        setResult(null); // Clear previous results
 
         try {
+            // First step: Fast analysis (skip insights)
             const res = await fetch("/api/compatibility", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ partnerA, partnerB }),
+                body: JSON.stringify({
+                    partnerA,
+                    partnerB,
+                    skip_insights: true
+                }),
             });
 
             if (!res.ok) {
@@ -64,10 +68,16 @@ export default function MatchPage() {
 
             const data: CompatibilityResponse = await res.json();
             setResult(data);
+            setOpenSection("scores"); // Auto-open scores
+
             // Scroll to results
             setTimeout(() => {
-                document.getElementById("results-start")?.scrollIntoView({ behavior: "smooth" });
+                const resultsElement = document.getElementById("results-container");
+                if (resultsElement) {
+                    resultsElement.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
             }, 100);
+
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
@@ -75,38 +85,42 @@ export default function MatchPage() {
         }
     };
 
-    const handleUnlockInsights = async () => {
+    const handleGetInsights = async () => {
         if (!result) return;
-        setInsightsStage("loading");
-        setInsightsError(null);
+
+        setInsightsLoading(true);
+        setError(null);
 
         try {
-            const res = await fetch("/api/compatibility/insights", {
+            const res = await fetch("/api/insights/compatibility", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ partnerA, partnerB }),
             });
 
             if (!res.ok) {
-                throw new Error("Failed to fetch cosmic insights");
+                const data = await res.json();
+                throw new Error(data.detail || data.error || "Insights generation failed");
             }
 
             const data = await res.json();
-            setResult(prev => prev ? { ...prev, insights: data.insights } : null);
-            setInsightsStage("loaded");
 
-            // Scroll to insights
-            setTimeout(() => {
-                document.getElementById("insights-start")?.scrollIntoView({ behavior: "smooth" });
-            }, 100);
+            // Merge the new insights into the existing result
+            setResult(prev => {
+                if (!prev) return data;
+                return {
+                    ...prev,
+                    insights: data.llm_insights, // The endpoint returns "llm_insights" 
+                };
+            });
+
+            setOpenSection("guidance"); // Auto-open guidance section
+
         } catch (err) {
-            setInsightsStage("initial");
-            setInsightsError("Failed to connect to the cosmic source. Please try again.");
+            setError(err instanceof Error ? err.message : "Failed to load insights");
+        } finally {
+            setInsightsLoading(false);
         }
-    };
-
-    const toggleSection = (section: string) => {
-        setActiveSection(activeSection === section ? null : section);
     };
 
     return (
@@ -174,173 +188,191 @@ export default function MatchPage() {
 
                 {/* Results Section */}
                 {result && (
-                    <div id="results-start" className="mt-16 space-y-8 animate-fadeIn">
+                    <div id="results-container" className="mt-8 space-y-6 animate-fadeIn max-w-4xl mx-auto">
 
-                        {/* Two Score Cards - Side by Side (Always Visible) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
-                            {/* Indicator Score */}
-                            <div className="flex flex-col items-center">
-                                <h2 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-4">
-                                    Indicator Score
-                                </h2>
-                                <ScoreRing
-                                    score={result.compatibility.overall_score_100}
-                                    maxScore={100}
-                                    label={result.compatibility.label}
-                                />
-                            </div>
+                        {/* SECTION 1: Compatibility Scores */}
+                        <CollapsibleSection
+                            title="Compatibility Scores"
+                            icon="query_stats"
+                            isOpen={openSection === "scores"}
+                            onToggle={() => setOpenSection(openSection === "scores" ? null : "scores")}
+                        >
+                            <div className="py-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Indicator Score */}
+                                    <div className="flex flex-col items-center">
+                                        <h2 className="font-serif text-lg text-center text-[#8b6914] dark:text-gold-light mb-4">
+                                            Vedic Indicator Score
+                                        </h2>
+                                        <div className="scale-90 transform -mt-4">
+                                            <ScoreRing
+                                                score={result.compatibility.overall_score_100}
+                                                maxScore={100}
+                                                label={result.compatibility.label}
+                                            />
+                                        </div>
+                                    </div>
 
-                            {/* Guna Score */}
-                            <div className="flex flex-col items-center">
-                                <h2 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-4">
-                                    Guna Milan Score
-                                </h2>
-                                <ScoreRing
-                                    score={result.guna.total_points}
-                                    maxScore={36}
-                                    label={result.guna.verdict}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Accordion Sections */}
-                        <div className="max-w-4xl mx-auto space-y-4">
-
-                            {/* Guna Matching Details */}
-                            <CollapsibleSection
-                                title="Ashtakoota Guna Details"
-                                isOpen={activeSection === "guna"}
-                                onToggle={() => toggleSection("guna")}
-                            >
-                                <GunaCard guna={result.guna} />
-                            </CollapsibleSection>
-
-                            {/* Compatibility Dimensions */}
-                            <CollapsibleSection
-                                title="Compatibility Dimensions"
-                                isOpen={activeSection === "dimensions"}
-                                onToggle={() => toggleSection("dimensions")}
-                            >
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                                    <DimensionCard
-                                        title="Emotional"
-                                        dimension={result.compatibility.dimensions.emotional}
-                                        icon="self_improvement"
-                                        colorClass="from-blue-600/30 to-blue-900/50 text-blue-300 border-blue-500"
-                                    />
-                                    <DimensionCard
-                                        title="Communication"
-                                        dimension={result.compatibility.dimensions.communication}
-                                        icon="forum"
-                                        colorClass="from-green-600/30 to-green-900/50 text-green-300 border-green-500"
-                                    />
-                                    <DimensionCard
-                                        title="Attraction"
-                                        dimension={result.compatibility.dimensions.attraction}
-                                        icon="favorite"
-                                        colorClass="from-pink-600/30 to-pink-900/50 text-pink-300 border-pink-500"
-                                    />
-                                    <DimensionCard
-                                        title="Stability"
-                                        dimension={result.compatibility.dimensions.stability}
-                                        icon="balance"
-                                        colorClass="from-amber-600/30 to-amber-900/50 text-amber-300 border-amber-500"
-                                    />
+                                    {/* Guna Score */}
+                                    <div className="flex flex-col items-center">
+                                        <h2 className="font-serif text-lg text-center text-[#8b6914] dark:text-gold-light mb-4">
+                                            Ashtakoota Guna Milan
+                                        </h2>
+                                        <div className="scale-90 transform -mt-4">
+                                            <ScoreRing
+                                                score={result.guna.total_points}
+                                                maxScore={36}
+                                                label={result.guna.verdict}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                            </CollapsibleSection>
 
-                            {/* Planetary Signals */}
-                            <CollapsibleSection
-                                title="Planetary Signals"
-                                isOpen={activeSection === "signals"}
-                                onToggle={() => toggleSection("signals")}
-                            >
-                                <div className="pt-2">
+                                {/* Toggle Charts */}
+                                <div className="flex justify-center mt-2 mb-4">
+                                    <button
+                                        onClick={() => setShowCharts(!showCharts)}
+                                        className="px-4 py-2 text-sm bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-full text-primary transition-colors flex items-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">
+                                            {showCharts ? "visibility_off" : "visibility"}
+                                        </span>
+                                        {showCharts ? "Hide" : "Show"} Birth Charts
+                                    </button>
+                                </div>
+
+                                {/* Birth Charts */}
+                                {showCharts && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 animate-fadeIn">
+                                        <ChartCard chart={result.charts.partnerA} label="Partner A" />
+                                        <ChartCard chart={result.charts.partnerB} label="Partner B" />
+                                    </div>
+                                )}
+                            </div>
+                        </CollapsibleSection>
+
+                        {/* SECTION 2: Detailed Analysis */}
+                        <CollapsibleSection
+                            title="Detailed Analysis"
+                            icon="analytics"
+                            isOpen={openSection === "analysis"}
+                            onToggle={() => setOpenSection(openSection === "analysis" ? null : "analysis")}
+                        >
+                            <div className="py-6 space-y-10">
+                                {/* Dimension Cards */}
+                                <div>
+                                    <h3 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-6">
+                                        Compatibility Dimensions
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <DimensionCard
+                                            title="Emotional"
+                                            dimension={result.compatibility.dimensions.emotional}
+                                            icon="self_improvement"
+                                            colorClass="from-blue-600/30 to-blue-900/50 text-blue-300 border-blue-500"
+                                        />
+                                        <DimensionCard
+                                            title="Communication"
+                                            dimension={result.compatibility.dimensions.communication}
+                                            icon="forum"
+                                            colorClass="from-green-600/30 to-green-900/50 text-green-300 border-green-500"
+                                        />
+                                        <DimensionCard
+                                            title="Attraction"
+                                            dimension={result.compatibility.dimensions.attraction}
+                                            icon="favorite"
+                                            colorClass="from-pink-600/30 to-pink-900/50 text-pink-300 border-pink-500"
+                                        />
+                                        <DimensionCard
+                                            title="Stability"
+                                            dimension={result.compatibility.dimensions.stability}
+                                            icon="balance"
+                                            colorClass="from-amber-600/30 to-amber-900/50 text-amber-300 border-amber-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Guna Matching Details */}
+                                <div>
+                                    <h3 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-6">
+                                        Guna Breakdown
+                                    </h3>
+                                    <GunaCard guna={result.guna} />
+                                </div>
+
+                                {/* Explainers */}
+                                <div>
+                                    <h3 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-6">
+                                        Key Observations
+                                    </h3>
                                     <ExplainersCard
                                         signals={result.compatibility.signals}
                                         explainers={result.compatibility.explainers}
                                     />
                                 </div>
-                            </CollapsibleSection>
+                            </div>
+                        </CollapsibleSection>
 
-                            {/* Birth Charts */}
-                            <CollapsibleSection
-                                title="Birth Charts"
-                                isOpen={activeSection === "charts"}
-                                onToggle={() => toggleSection("charts")}
-                            >
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
-                                    <ChartCard chart={result.charts.partnerA} label="Partner A" />
-                                    <ChartCard chart={result.charts.partnerB} label="Partner B" />
-                                </div>
-                            </CollapsibleSection>
-                        </div>
-
-                        {/* AI Section / Call to Action */}
-                        <div className="max-w-4xl mx-auto mt-16 pt-8 border-t border-primary/20">
-                            {insightsStage === "initial" && (
-                                <div className="text-center py-12 bg-gradient-to-b from-primary/5 to-transparent rounded-2xl border border-primary/10">
-                                    <span className="material-symbols-outlined text-5xl text-gold-3d mb-4 animate-pulse">
-                                        auto_awesome
-                                    </span>
-                                    <h3 className="font-serif text-3xl text-[#8b6914] dark:text-gold-light mb-4">
-                                        Unlock Cosmic Wisdom
-                                    </h3>
-                                    <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-lg mx-auto">
-                                        Go beyond the numbers. Consult the AI Vedic Astrologer for a detailed
-                                        relationship analysis, psychological compatibility, and personalized remedies.
-                                    </p>
-                                    <button
-                                        onClick={handleUnlockInsights}
-                                        className="px-8 py-4 bg-gradient-to-r from-[#1a0b2e] to-[#4a2b7e] hover:to-[#5a3b8e] border border-primary/50 rounded-full text-gold-light font-bold tracking-wider shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_35px_rgba(212,175,55,0.5)] transition-all duration-300 flex items-center gap-3 mx-auto"
-                                    >
-                                        <span className="material-symbols-outlined">psychology</span>
-                                        Reveal Detailed Insights
-                                    </button>
-                                    {insightsError && (
-                                        <p className="text-red-400 mt-4 text-sm">{insightsError}</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {insightsStage === "loading" && (
-                                <div className="text-center py-16">
-                                    <div className="w-20 h-20 mx-auto mb-6 relative">
-                                        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
-                                        <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin"></div>
-                                        <span className="absolute inset-0 flex items-center justify-center material-symbols-outlined text-3xl text-primary animate-pulse">
-                                            auto_awesome
+                        {/* SECTION 3: Cosmic Guidance (AI) */}
+                        <CollapsibleSection
+                            title="Cosmic Guidance"
+                            icon="auto_awesome"
+                            isOpen={openSection === "guidance"}
+                            onToggle={() => setOpenSection(openSection === "guidance" ? null : "guidance")}
+                            className={!result.insights ? "border-primary/60 shadow-[0_0_15px_rgba(212,175,55,0.2)]" : ""}
+                        >
+                            <div className="py-6">
+                                {!result.insights ? (
+                                    <div className="text-center py-8">
+                                        <span className="material-symbols-outlined text-5xl text-primary mb-4 animate-pulse">
+                                            psychology_alt
                                         </span>
+                                        <h3 className="font-serif text-2xl text-[#8b6914] dark:text-gold-light mb-3">
+                                            Unlock Cosmic Wisdom
+                                        </h3>
+                                        <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-md mx-auto">
+                                            Get a detailed AI-powered analysis of your relationship dynamics,
+                                            potential challenges, and personalized remedies.
+                                        </p>
+                                        <button
+                                            onClick={handleGetInsights}
+                                            disabled={insightsLoading}
+                                            className="px-8 py-3 bg-gradient-to-r from-primary via-[#b8860b] to-primary text-[#1a0b2e] font-bold rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:scale-105 transition-all duration-300 flex items-center gap-2 mx-auto disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            {insightsLoading ? (
+                                                <>
+                                                    <span className="material-symbols-outlined animate-spin">
+                                                        progress_activity
+                                                    </span>
+                                                    Consulting the Stars...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined">
+                                                        auto_awesome
+                                                    </span>
+                                                    Reveal Insights & Remedies
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
-                                    <h3 className="font-serif text-2xl text-gold-light mb-2">
-                                        Consulting the Stars...
-                                    </h3>
-                                    <p className="text-primary/60 text-sm animate-pulse">
-                                        Analyzing planetary aspects and nakshatra compatibility
-                                    </p>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="space-y-10 animate-fadeIn">
+                                        <CosmicInsights insights={result.insights} />
 
-                            {insightsStage === "loaded" && result.insights && (
-                                <div id="insights-start" className="animate-fadeIn space-y-12">
-                                    {/* Cosmic Insights */}
-                                    <CosmicInsights insights={result.insights} />
-
-                                    {/* Chat Section */}
-                                    <div>
-                                        <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
-                                            Guidance & Remedies
-                                        </h2>
-                                        <div className="max-w-3xl mx-auto">
+                                        <div>
+                                            <h3 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-6">
+                                                Ask the Stars
+                                            </h3>
                                             <MatchChat result={result} />
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        </CollapsibleSection>
 
                         {/* Disclaimer */}
-                        <div className="max-w-3xl mx-auto text-center p-6 bg-primary/5 border border-primary/20 rounded-lg">
+                        <div className="max-w-3xl mx-auto text-center p-6 bg-primary/5 border border-primary/20 rounded-lg mt-8">
                             <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                                 <strong>Disclaimer:</strong> This analysis uses both
                                 indicator-based metrics and traditional Ashtakoota Guna Milan.
@@ -355,5 +387,3 @@ export default function MatchPage() {
         </div>
     );
 }
-
-import { CollapsibleSection } from "@/components/CollapsibleSection";

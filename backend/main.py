@@ -20,10 +20,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from schemas import BirthInput
-from chart import calculate_vedic_chart
-from match import compatibility_indicators
-from guna import calculate_guna_milan
+from .schemas import BirthInput
+from .chart import calculate_vedic_chart
+from .match import compatibility_indicators
+from .guna import calculate_guna_milan
 
 
 app = FastAPI(
@@ -108,7 +108,7 @@ async def calculate_chart(req: ChartRequest):
         
         # Generate LLM insights (graceful fallback if timeout)
         try:
-            from llm_langchain import generate_chart_insights
+            from .llm_langchain import generate_chart_insights
             insights = generate_chart_insights(chart.to_dict())
             response["insights"] = insights
         except Exception as llm_error:
@@ -158,7 +158,7 @@ async def calculate_compatibility(req: CompatibilityRequest):
 
         # Generate LLM insights (graceful fallback if timeout)
         try:
-            from llm_langchain import generate_compatibility_insights
+            from .llm_langchain import generate_compatibility_insights
             insights = generate_compatibility_insights(result)
             result["insights"] = insights
         except Exception as llm_error:
@@ -198,7 +198,7 @@ async def chat_chart(req: ChartChatRequest):
     """Chat about a birth chart using LLM."""
     try:
         t_start = time.time()
-        from llm_langchain import chat_about_chart
+        from .llm_langchain import chat_about_chart
         response = chat_about_chart(req.chart, req.question, req.history)
         t_end = time.time()
         print(f"⏱️  Chat: {round(t_end - t_start, 1)}s")
@@ -213,7 +213,7 @@ async def chat_chart(req: ChartChatRequest):
 async def chat_compatibility(req: CompatibilityChatRequest):
     """Chat about compatibility using LLM."""
     try:
-        from llm_langchain import chat_about_compatibility
+        from .llm_langchain import chat_about_compatibility
         response = chat_about_compatibility(req.result, req.question, req.history)
         return {"response": response}
     except ValueError as e:
@@ -230,7 +230,7 @@ async def generate_chart_insights_endpoint(req: ChartRequest):
         chart = calculate_vedic_chart(birth)
         chart_dict = chart.to_dict()
         
-        from llm_langchain import generate_chart_insights
+        from .llm_langchain import generate_chart_insights
         insights = generate_chart_insights(chart_dict)
         
         return {
@@ -265,7 +265,7 @@ async def generate_compatibility_insights_endpoint(req: CompatibilityRequest):
             "guna": guna.to_dict(),
         }
         
-        from llm_langchain import generate_compatibility_insights
+        from .llm_langchain import generate_compatibility_insights
         insights = generate_compatibility_insights(result)
         
         return {

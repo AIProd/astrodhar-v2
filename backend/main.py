@@ -142,7 +142,7 @@ async def calculate_compatibility(req: CompatibilityRequest):
         chart_a = calculate_vedic_chart(birth_a)
         chart_b = calculate_vedic_chart(birth_b)
 
-        # Calculate both indicator-based and traditional Guna matching
+    # Calculate both indicator-based and traditional Guna matching
         indicators = compatibility_indicators(chart_a, chart_b)
         guna = calculate_guna_milan(chart_a, chart_b)
         t_chart = time.time()
@@ -154,24 +154,14 @@ async def calculate_compatibility(req: CompatibilityRequest):
             },
             "compatibility": indicators.to_dict(),
             "guna": guna.to_dict(),
+            # No insights initially - requested separately
+            "insights": None
         }
 
-        # Generate LLM insights (graceful fallback if timeout)
-        try:
-            from .llm_langchain import generate_compatibility_insights
-            insights = generate_compatibility_insights(result)
-            result["insights"] = insights
-        except Exception as llm_error:
-            # LLM failed/timed out - continue with chart data only
-            print(f"⚠️  LLM insights generation failed (continuing without insights): {llm_error}")
-            result["insights"] = "Charts calculated successfully. AI insights temporarily unavailable — please try refreshing."
-        
         t_end = time.time()
-        chart_time = round(t_chart - t_start, 1)
-        llm_time = round(t_end - t_chart, 1)
         total_time = round(t_end - t_start, 1)
-        print(f"⏱️  Compat Chart: {chart_time}s | LLM: {llm_time}s | Total: {total_time}s")
-        result["timing"] = {"chart": chart_time, "llm": llm_time, "total": total_time}
+        print(f"⏱️  Compat Chart: {total_time}s")
+        result["timing"] = {"chart": total_time, "llm": 0, "total": total_time}
         
         return result
         
@@ -179,6 +169,51 @@ async def calculate_compatibility(req: CompatibilityRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Compatibility calculation failed: {str(e)}")
+
+
+@router.post("/compatibility/insights")
+async def generate_compatibility_insights_endpoint(req: CompatibilityRequest):
+    """Generate LLM insights for compatibility (slow operation)."""
+    try:
+        t_start = time.time()
+        birth_a = _to_birth_input(req.partnerA)
+        birth_b = _to_birth_input(req.partnerB)
+
+        chart_a = calculate_vedic_chart(birth_a)
+        chart_b = calculate_vedic_chart(birth_b)
+
+        indicators = compatibility_indicators(chart_a, chart_b)
+        guna = calculate_guna_milan(chart_a, chart_b)
+        t_chart = time.time()
+        
+        # Reconstruct result for context
+        result = {
+            "charts": {
+                "partnerA": chart_a.to_dict(),
+                "partnerB": chart_b.to_dict(),
+            },
+            "compatibility": indicators.to_dict(),
+            "guna": guna.to_dict(),
+        }
+
+        # Generate LLM insights
+        try:
+            from .llm_langchain import generate_compatibility_insights
+            insights = generate_compatibility_insights(result)
+        except Exception as llm_error:
+            print(f"⚠️  LLM insights generation failed: {llm_error}")
+            raise HTTPException(status_code=503, detail="AI insights service temporarily unavailable")
+        
+        t_end = time.time()
+        llm_time = round(t_end - t_chart, 1)
+        print(f"⏱️  Compat Insights: {llm_time}s")
+        
+        return {"insights": insights, "timing": {"llm": llm_time}}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Insights generation failed: {str(e)}")
 
 # LLM Chat Endpoints
 class ChartChatRequest(BaseModel):

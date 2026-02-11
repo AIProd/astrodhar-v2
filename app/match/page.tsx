@@ -29,6 +29,11 @@ export default function MatchPage() {
     const [error, setError] = useState<string | null>(null);
     const [showCharts, setShowCharts] = useState(false);
 
+    // New state for accordion and deferred insights
+    const [activeSection, setActiveSection] = useState<string | null>("guna");
+    const [insightsStage, setInsightsStage] = useState<"initial" | "loading" | "loaded">("initial");
+    const [insightsError, setInsightsError] = useState<string | null>(null);
+
     const isValid = (b: BirthInput) =>
         b.name.trim() && b.date && b.time && b.lat !== 0 && b.lon !== 0;
 
@@ -42,6 +47,8 @@ export default function MatchPage() {
 
         setLoading(true);
         setError(null);
+        setResult(null);
+        setInsightsStage("initial"); // Reset AI stage
 
         try {
             const res = await fetch("/api/compatibility", {
@@ -57,11 +64,49 @@ export default function MatchPage() {
 
             const data: CompatibilityResponse = await res.json();
             setResult(data);
+            // Scroll to results
+            setTimeout(() => {
+                document.getElementById("results-start")?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleUnlockInsights = async () => {
+        if (!result) return;
+        setInsightsStage("loading");
+        setInsightsError(null);
+
+        try {
+            const res = await fetch("/api/compatibility/insights", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ partnerA, partnerB }),
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to fetch cosmic insights");
+            }
+
+            const data = await res.json();
+            setResult(prev => prev ? { ...prev, insights: data.insights } : null);
+            setInsightsStage("loaded");
+
+            // Scroll to insights
+            setTimeout(() => {
+                document.getElementById("insights-start")?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
+        } catch (err) {
+            setInsightsStage("initial");
+            setInsightsError("Failed to connect to the cosmic source. Please try again.");
+        }
+    };
+
+    const toggleSection = (section: string) => {
+        setActiveSection(activeSection === section ? null : section);
     };
 
     return (
@@ -129,14 +174,10 @@ export default function MatchPage() {
 
                 {/* Results Section */}
                 {result && (
-                    <div className="mt-16 space-y-16 animate-fadeIn">
-                        {/* Cosmic Insights */}
-                        <div className="max-w-4xl mx-auto">
-                            <CosmicInsights insights={result.insights} />
-                        </div>
+                    <div id="results-start" className="mt-16 space-y-8 animate-fadeIn">
 
-                        {/* Two Score Cards - Side by Side */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                        {/* Two Score Cards - Side by Side (Always Visible) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
                             {/* Indicator Score */}
                             <div className="flex flex-col items-center">
                                 <h2 className="font-serif text-xl text-center text-[#8b6914] dark:text-gold-light mb-4">
@@ -162,91 +203,140 @@ export default function MatchPage() {
                             </div>
                         </div>
 
-                        {/* Toggle Charts */}
-                        <div className="flex justify-center">
-                            <button
-                                onClick={() => setShowCharts(!showCharts)}
-                                className="px-6 py-2 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
+                        {/* Accordion Sections */}
+                        <div className="max-w-4xl mx-auto space-y-4">
+
+                            {/* Guna Matching Details */}
+                            <CollapsibleSection
+                                title="Ashtakoota Guna Details"
+                                isOpen={activeSection === "guna"}
+                                onToggle={() => toggleSection("guna")}
                             >
-                                <span className="material-symbols-outlined">
-                                    {showCharts ? "visibility_off" : "visibility"}
-                                </span>
-                                {showCharts ? "Hide" : "Show"} Birth Charts
-                            </button>
-                        </div>
-
-                        {/* Birth Charts */}
-                        {showCharts && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <ChartCard chart={result.charts.partnerA} label="Partner A" />
-                                <ChartCard chart={result.charts.partnerB} label="Partner B" />
-                            </div>
-                        )}
-
-                        {/* Guna Matching Details */}
-                        <div>
-                            <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
-                                Ashtakoota Guna Matching
-                            </h2>
-                            <div className="max-w-3xl mx-auto">
                                 <GunaCard guna={result.guna} />
-                            </div>
+                            </CollapsibleSection>
+
+                            {/* Compatibility Dimensions */}
+                            <CollapsibleSection
+                                title="Compatibility Dimensions"
+                                isOpen={activeSection === "dimensions"}
+                                onToggle={() => toggleSection("dimensions")}
+                            >
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                    <DimensionCard
+                                        title="Emotional"
+                                        dimension={result.compatibility.dimensions.emotional}
+                                        icon="self_improvement"
+                                        colorClass="from-blue-600/30 to-blue-900/50 text-blue-300 border-blue-500"
+                                    />
+                                    <DimensionCard
+                                        title="Communication"
+                                        dimension={result.compatibility.dimensions.communication}
+                                        icon="forum"
+                                        colorClass="from-green-600/30 to-green-900/50 text-green-300 border-green-500"
+                                    />
+                                    <DimensionCard
+                                        title="Attraction"
+                                        dimension={result.compatibility.dimensions.attraction}
+                                        icon="favorite"
+                                        colorClass="from-pink-600/30 to-pink-900/50 text-pink-300 border-pink-500"
+                                    />
+                                    <DimensionCard
+                                        title="Stability"
+                                        dimension={result.compatibility.dimensions.stability}
+                                        icon="balance"
+                                        colorClass="from-amber-600/30 to-amber-900/50 text-amber-300 border-amber-500"
+                                    />
+                                </div>
+                            </CollapsibleSection>
+
+                            {/* Planetary Signals */}
+                            <CollapsibleSection
+                                title="Planetary Signals"
+                                isOpen={activeSection === "signals"}
+                                onToggle={() => toggleSection("signals")}
+                            >
+                                <div className="pt-2">
+                                    <ExplainersCard
+                                        signals={result.compatibility.signals}
+                                        explainers={result.compatibility.explainers}
+                                    />
+                                </div>
+                            </CollapsibleSection>
+
+                            {/* Birth Charts */}
+                            <CollapsibleSection
+                                title="Birth Charts"
+                                isOpen={activeSection === "charts"}
+                                onToggle={() => toggleSection("charts")}
+                            >
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+                                    <ChartCard chart={result.charts.partnerA} label="Partner A" />
+                                    <ChartCard chart={result.charts.partnerB} label="Partner B" />
+                                </div>
+                            </CollapsibleSection>
                         </div>
 
-                        {/* Dimension Cards */}
-                        <div>
-                            <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
-                                Compatibility Dimensions
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <DimensionCard
-                                    title="Emotional"
-                                    dimension={result.compatibility.dimensions.emotional}
-                                    icon="self_improvement"
-                                    colorClass="from-blue-600/30 to-blue-900/50 text-blue-300 border-blue-500"
-                                />
-                                <DimensionCard
-                                    title="Communication"
-                                    dimension={result.compatibility.dimensions.communication}
-                                    icon="forum"
-                                    colorClass="from-green-600/30 to-green-900/50 text-green-300 border-green-500"
-                                />
-                                <DimensionCard
-                                    title="Attraction"
-                                    dimension={result.compatibility.dimensions.attraction}
-                                    icon="favorite"
-                                    colorClass="from-pink-600/30 to-pink-900/50 text-pink-300 border-pink-500"
-                                />
-                                <DimensionCard
-                                    title="Stability"
-                                    dimension={result.compatibility.dimensions.stability}
-                                    icon="balance"
-                                    colorClass="from-amber-600/30 to-amber-900/50 text-amber-300 border-amber-500"
-                                />
-                            </div>
-                        </div>
+                        {/* AI Section / Call to Action */}
+                        <div className="max-w-4xl mx-auto mt-16 pt-8 border-t border-primary/20">
+                            {insightsStage === "initial" && (
+                                <div className="text-center py-12 bg-gradient-to-b from-primary/5 to-transparent rounded-2xl border border-primary/10">
+                                    <span className="material-symbols-outlined text-5xl text-gold-3d mb-4 animate-pulse">
+                                        auto_awesome
+                                    </span>
+                                    <h3 className="font-serif text-3xl text-[#8b6914] dark:text-gold-light mb-4">
+                                        Unlock Cosmic Wisdom
+                                    </h3>
+                                    <p className="text-gray-600 dark:text-gray-300 mb-8 max-w-lg mx-auto">
+                                        Go beyond the numbers. Consult the AI Vedic Astrologer for a detailed
+                                        relationship analysis, psychological compatibility, and personalized remedies.
+                                    </p>
+                                    <button
+                                        onClick={handleUnlockInsights}
+                                        className="px-8 py-4 bg-gradient-to-r from-[#1a0b2e] to-[#4a2b7e] hover:to-[#5a3b8e] border border-primary/50 rounded-full text-gold-light font-bold tracking-wider shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_35px_rgba(212,175,55,0.5)] transition-all duration-300 flex items-center gap-3 mx-auto"
+                                    >
+                                        <span className="material-symbols-outlined">psychology</span>
+                                        Reveal Detailed Insights
+                                    </button>
+                                    {insightsError && (
+                                        <p className="text-red-400 mt-4 text-sm">{insightsError}</p>
+                                    )}
+                                </div>
+                            )}
 
-                        {/* Explainers */}
-                        <div>
-                            <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
-                                Detailed Insights
-                            </h2>
-                            <div className="grid grid-cols-1">
-                                <ExplainersCard
-                                    signals={result.compatibility.signals}
-                                    explainers={result.compatibility.explainers}
-                                />
-                            </div>
-                        </div>
+                            {insightsStage === "loading" && (
+                                <div className="text-center py-16">
+                                    <div className="w-20 h-20 mx-auto mb-6 relative">
+                                        <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+                                        <div className="absolute inset-0 rounded-full border-4 border-t-primary animate-spin"></div>
+                                        <span className="absolute inset-0 flex items-center justify-center material-symbols-outlined text-3xl text-primary animate-pulse">
+                                            auto_awesome
+                                        </span>
+                                    </div>
+                                    <h3 className="font-serif text-2xl text-gold-light mb-2">
+                                        Consulting the Stars...
+                                    </h3>
+                                    <p className="text-primary/60 text-sm animate-pulse">
+                                        Analyzing planetary aspects and nakshatra compatibility
+                                    </p>
+                                </div>
+                            )}
 
-                        {/* Chat Section for Remedies */}
-                        <div>
-                            <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
-                                Guidance & Remedies
-                            </h2>
-                            <div className="max-w-3xl mx-auto">
-                                <MatchChat result={result} />
-                            </div>
+                            {insightsStage === "loaded" && result.insights && (
+                                <div id="insights-start" className="animate-fadeIn space-y-12">
+                                    {/* Cosmic Insights */}
+                                    <CosmicInsights insights={result.insights} />
+
+                                    {/* Chat Section */}
+                                    <div>
+                                        <h2 className="font-serif text-2xl text-center text-[#8b6914] dark:text-gold-light mb-8">
+                                            Guidance & Remedies
+                                        </h2>
+                                        <div className="max-w-3xl mx-auto">
+                                            <MatchChat result={result} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Disclaimer */}
@@ -265,3 +355,5 @@ export default function MatchPage() {
         </div>
     );
 }
+
+import { CollapsibleSection } from "@/components/CollapsibleSection";

@@ -60,7 +60,6 @@ class BirthInputRequest(BaseModel):
 class CompatibilityRequest(BaseModel):
     partnerA: BirthInputRequest
     partnerB: BirthInputRequest
-    skip_insights: bool = False
 
 
 class ChartRequest(BaseModel):
@@ -157,24 +156,19 @@ async def calculate_compatibility(req: CompatibilityRequest):
             "guna": guna.to_dict(),
         }
 
-        # Generate LLM insights (optional, skipped if requested)
-        llm_time = 0
-        if not req.skip_insights:
-            try:
-                from .llm_langchain import generate_compatibility_insights
-                insights = generate_compatibility_insights(result)
-                result["insights"] = insights
-            except Exception as llm_error:
-                # LLM failed/timed out - continue with chart data only
-                print(f"⚠️  LLM insights generation failed (continuing without insights): {llm_error}")
-                result["insights"] = "Charts calculated successfully. AI insights temporarily unavailable — please try refreshing."
-            t_end = time.time()
-            llm_time = round(t_end - t_chart, 1)
-        else:
-            t_end = t_chart
-            print("ℹ️  Skipping LLM insights as requested.")
+        # Generate LLM insights (graceful fallback if timeout)
+        try:
+            from .llm_langchain import generate_compatibility_insights
+            insights = generate_compatibility_insights(result)
+            result["insights"] = insights
+        except Exception as llm_error:
+            # LLM failed/timed out - continue with chart data only
+            print(f"⚠️  LLM insights generation failed (continuing without insights): {llm_error}")
+            result["insights"] = "Charts calculated successfully. AI insights temporarily unavailable — please try refreshing."
         
+        t_end = time.time()
         chart_time = round(t_chart - t_start, 1)
+        llm_time = round(t_end - t_chart, 1)
         total_time = round(t_end - t_start, 1)
         print(f"⏱️  Compat Chart: {chart_time}s | LLM: {llm_time}s | Total: {total_time}s")
         result["timing"] = {"chart": chart_time, "llm": llm_time, "total": total_time}

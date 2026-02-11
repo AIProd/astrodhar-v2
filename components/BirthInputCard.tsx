@@ -136,7 +136,7 @@ export function BirthInputCard({
     const positionClass = position === "center" ? "mx-auto lg:w-5/12" : "lg:w-5/12";
 
     return (
-        <div className={`glass-panel embossed-gold-border rounded-xl p-8 w-full ${positionClass} relative group hover:shadow-gold-glow transition-all duration-500`}>
+        <div className={`glass-panel embossed-gold-border rounded-xl p-5 md:p-8 w-full ${positionClass} relative group hover:shadow-gold-glow transition-all duration-500`}>
             {/* Corner decoration */}
             <div
                 className={`absolute top-0 ${position === "left" || position === "center" ? "left-0 border-l-2 rounded-tl-lg" : "right-0 border-r-2 rounded-tr-lg"} w-8 h-8 border-t-2 border-primary opacity-60`}
@@ -154,7 +154,7 @@ export function BirthInputCard({
                 <div>
                     <label
                         htmlFor={`${label}-name`}
-                        className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1"
+                        className="block text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1"
                     >
                         Full Name
                     </label>
@@ -174,9 +174,9 @@ export function BirthInputCard({
                 </div>
 
                 {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
+                        <label className="block text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
                             Date of Birth
                         </label>
                         <div className="relative">
@@ -206,7 +206,7 @@ export function BirthInputCard({
                         </div>
                     </div>
                     <div>
-                        <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
+                        <label className="block text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
                             Time of Birth
                         </label>
                         <div className="relative">
@@ -228,7 +228,7 @@ export function BirthInputCard({
 
                 {/* City Search with Autocomplete */}
                 <div className="relative" ref={suggestionRef}>
-                    <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
+                    <label className="block text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
                         City / Town / Village of Birth
                     </label>
                     <div className="relative group/input">

@@ -22,7 +22,7 @@ export default function HomePage() {
                 {/* Compatibility Analysis */}
                 <Link
                     href="/match"
-                    className="group glass-panel embossed-gold-border rounded-xl p-10 text-center hover:-translate-y-3 hover:shadow-[0_12px_40px_rgba(212,175,55,0.3)] transition-all duration-500 cursor-pointer"
+                    className="group glass-panel embossed-gold-border rounded-xl p-6 md:p-10 text-center hover:-translate-y-3 hover:shadow-[0_12px_40px_rgba(212,175,55,0.3)] transition-all duration-500 cursor-pointer"
                 >
                     <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-pink-500/20 via-red-500/20 to-primary/20 flex items-center justify-center border border-primary/40 group-hover:scale-110 transition-transform duration-500">
                         <span className="material-symbols-outlined text-4xl text-primary">
@@ -45,7 +45,7 @@ export default function HomePage() {
                 {/* Personal Traits */}
                 <Link
                     href="/traits"
-                    className="group glass-panel embossed-gold-border rounded-xl p-10 text-center hover:-translate-y-3 hover:shadow-[0_12px_40px_rgba(212,175,55,0.3)] transition-all duration-500 cursor-pointer"
+                    className="group glass-panel embossed-gold-border rounded-xl p-6 md:p-10 text-center hover:-translate-y-3 hover:shadow-[0_12px_40px_rgba(212,175,55,0.3)] transition-all duration-500 cursor-pointer"
                 >
                     <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-primary/20 flex items-center justify-center border border-primary/40 group-hover:scale-110 transition-transform duration-500">
                         <span className="material-symbols-outlined text-4xl text-primary">

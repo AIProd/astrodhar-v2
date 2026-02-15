@@ -11,6 +11,7 @@ interface Message {
 
 interface TraitsChatProps {
     chart: VedicChart;
+    insights?: string;
 }
 
 const MAX_CONVERSATION_PAIRS = 10;
@@ -23,7 +24,7 @@ const STARTER_QUESTIONS = [
     "What remedies will help me right now?",
 ];
 
-export function TraitsChat({ chart }: TraitsChatProps) {
+export function TraitsChat({ chart, insights }: TraitsChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -55,7 +56,8 @@ export function TraitsChat({ chart }: TraitsChatProps) {
                 body: JSON.stringify({
                     chart,
                     question,
-                    history: messages  // Send conversation history for context
+                    history: messages,  // Send conversation history for context
+                    insights,           // Send previously generated insights
                 }),
             });
 

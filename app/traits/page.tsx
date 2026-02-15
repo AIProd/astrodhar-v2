@@ -213,7 +213,7 @@ export default function TraitsPage() {
                         )}
 
                         {/* AI Chat */}
-                        <TraitsChat chart={chart} />
+                        <TraitsChat chart={chart} insights={chart.insights} />
                     </div>
                 )}
             </div>

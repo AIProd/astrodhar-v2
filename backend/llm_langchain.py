@@ -291,76 +291,123 @@ compatibility_insights_chain = compatibility_insights_prompt | llm_insights | St
 # DATA FORMATTING
 # ============================================================================
 
-def format_chart_context(chart: Dict[str, Any]) -> str:
-    """Format chart data for LLM context."""
+def format_chart_context(chart: Dict[str, Any], insights: Optional[str] = None) -> str:
+    """Format chart data for LLM context — includes all planets, houses, retrogrades, and insights."""
     name = chart.get("name", "the native")
     
     # Ascendant
     asc = chart.get("ascendant", {})
     asc_sign = asc.get("sign", "Unknown")
+    asc_degree = asc.get("degree_in_sign", "")
     
-    # Moon
-    moon = chart.get("moon", {})
-    moon_sign = moon.get("sign", "Unknown")
-    moon_nakshatra = moon.get("nakshatra", "Unknown")
-    
-    # Sun
-    sun = chart.get("sun", {})
-    sun_sign = sun.get("sign", "Unknown")
+    # Moon nakshatra/pada
+    moon_data = chart.get("moon", {})
+    moon_nakshatra = moon_data.get("nakshatra", "Unknown")
+    moon_pada = moon_data.get("pada", "")
     
     context = f"""Name: {name}
-Ascendant (Lagna): {asc_sign}
-Sun: {sun_sign}
-Moon: {moon_sign} in {moon_nakshatra} nakshatra"""
+Ascendant (Lagna): {asc_sign} ({asc_degree}°)
+Moon Nakshatra: {moon_nakshatra} (Pada {moon_pada})"""
     
-    # Add other planets if available
-    planets = ["mercury", "venus", "mars", "jupiter", "saturn"]
-    for planet in planets:
-        if planet in chart:
-            p_data = chart[planet]
-            p_sign = p_data.get("sign", "Unknown")
-            context += f"\n{planet.capitalize()}: {p_sign}"
+    # Add all planets from the planets array
+    planets_list = chart.get("planets", [])
+    if planets_list:
+        context += "\n\nPlanetary Positions:"
+        for p in planets_list:
+            p_name = p.get("name", "Unknown")
+            p_sign = p.get("sign", "Unknown")
+            p_house = p.get("house_whole_sign", "")
+            p_degree = p.get("degree_in_sign", "")
+            p_retro = p.get("retrograde", False)
+            retro_tag = " (Retrograde)" if p_retro else ""
+            context += f"\n  {p_name}: {p_sign} ({p_degree}°) in House {p_house}{retro_tag}"
+    else:
+        # Fallback: try individual planet keys (legacy format)
+        for planet in ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "rahu", "ketu"]:
+            if planet in chart:
+                p_data = chart[planet]
+                p_sign = p_data.get("sign", "Unknown")
+                context += f"\n{planet.capitalize()}: {p_sign}"
+    
+    # Ayanamsa info
+    ayanamsa = chart.get("ayanamsa", {})
+    if ayanamsa:
+        context += f"\n\nAyanamsa: {ayanamsa.get('type', 'Lahiri')} ({ayanamsa.get('value_deg', ''):.2f}°)"
+    
+    # Include previously generated AI insights so the chatbot knows what it told the user
+    if insights:
+        context += f"\n\nPreviously Generated Insights for this chart:\n{insights}"
     
     return context
 
 
-def format_compatibility_context(result: Dict[str, Any]) -> str:
-    """Format compatibility result for LLM context."""
+def format_compatibility_context(result: Dict[str, Any], insights: Optional[str] = None) -> str:
+    """Format compatibility result for LLM context — includes full partner details and Guna kootas."""
     compat = result.get("compatibility", {})
     score = compat.get("overall_score_100", 0)
     label = compat.get("label", "Unknown")
     
     dims = compat.get("dimensions", {})
-    emotional = dims.get("emotional", {}).get("score", 0)
-    communication = dims.get("communication", {}).get("score", 0)
-    attraction = dims.get("attraction", {}).get("score", 0)
-    stability = dims.get("stability", {}).get("score", 0)
+    emotional = dims.get("emotional", {}).get("score", dims.get("emotional", {}).get("score_100", 0))
+    communication = dims.get("communication", {}).get("score", dims.get("communication", {}).get("score_100", 0))
+    attraction = dims.get("attraction", {}).get("score", dims.get("attraction", {}).get("score_100", 0))
+    stability = dims.get("stability", {}).get("score", dims.get("stability", {}).get("score_100", 0))
     
     # Guna Milan
     guna = result.get("guna", {})
     guna_score = guna.get("total_points", 0)
     guna_verdict = guna.get("verdict", "Unknown")
     
-    # Partner basics
+    # Partner details
     charts = result.get("charts", {})
     partner_a = charts.get("partnerA", {})
     partner_b = charts.get("partnerB", {})
     
     a_name = partner_a.get("name", "Partner A")
     b_name = partner_b.get("name", "Partner B")
-    a_moon = partner_a.get("moon", {}).get("sign", "Unknown")
-    b_moon = partner_b.get("moon", {}).get("sign", "Unknown")
+    a_moon = partner_a.get("moon", {}).get("nakshatra", partner_a.get("moon", {}).get("sign", "Unknown"))
+    b_moon = partner_b.get("moon", {}).get("nakshatra", partner_b.get("moon", {}).get("sign", "Unknown"))
+    a_asc = partner_a.get("ascendant", {}).get("sign", "Unknown")
+    b_asc = partner_b.get("ascendant", {}).get("sign", "Unknown")
     
     context = f"""Partners: {a_name} and {b_name}
-Moon Signs: {a_name} is {a_moon}, {b_name} is {b_moon}
+
+{a_name}'s Chart: Ascendant {a_asc}, Moon Nakshatra {a_moon}
+{b_name}'s Chart: Ascendant {b_asc}, Moon Nakshatra {b_moon}
 
 Compatibility Score: {score}/100 ({label})
-Emotional: {emotional}/100
-Communication: {communication}/100
-Attraction: {attraction}/100
-Stability: {stability}/100
+  Emotional: {emotional}/100
+  Communication: {communication}/100
+  Attraction: {attraction}/100
+  Stability: {stability}/100
 
 Guna Milan: {guna_score}/36 ({guna_verdict})"""
+    
+    # Add individual Guna Koota scores
+    kootas = guna.get("kootas", {})
+    if kootas:
+        context += "\n\nAshtakoota Breakdown:"
+        for koota_name, koota_data in kootas.items():
+            if isinstance(koota_data, dict):
+                pts = koota_data.get("points", 0)
+                mx = koota_data.get("max", 0)
+                desc = koota_data.get("description", "")
+                context += f"\n  {koota_name.capitalize()}: {pts}/{mx}"
+                if desc:
+                    context += f" — {desc}"
+    
+    # Signals and explainers
+    signals = compat.get("signals", [])
+    if signals:
+        context += "\n\nKey Signals: " + ", ".join(signals[:5])
+    
+    explainers = compat.get("explainers", [])
+    if explainers:
+        context += "\n\nDetailed Insights:\n" + "\n".join(f"  - {e}" for e in explainers[:5])
+    
+    # Include previously generated AI insights
+    if insights:
+        context += f"\n\nPreviously Generated Compatibility Insights:\n{insights}"
     
     return context
 
@@ -372,7 +419,8 @@ Guna Milan: {guna_score}/36 ({guna_verdict})"""
 def chat_about_chart(
     chart: Dict[str, Any],
     question: str,
-    history: List[Dict[str, str]] = None
+    history: List[Dict[str, str]] = None,
+    insights: Optional[str] = None
 ) -> str:
     """Generate LLM response about a birth chart using LangChain."""
     if history is None:
@@ -389,10 +437,10 @@ def chat_about_chart(
             chat_history.append(AIMessage(content=msg["content"]))
     
     try:
-        # Invoke chain with LangChain
+        # Invoke chain with LangChain — pass insights into context
         response = traits_chain.invoke({
             "temporal_context": get_current_astrological_context(),
-            "chart_context": format_chart_context(chart),
+            "chart_context": format_chart_context(chart, insights=insights),
             "chat_history": chat_history,
             "question": question
         })
@@ -405,7 +453,8 @@ def chat_about_chart(
 def chat_about_compatibility(
     result: Dict[str, Any],
     question: str,
-    history: List[Dict[str, str]] = None
+    history: List[Dict[str, str]] = None,
+    insights: Optional[str] = None
 ) -> str:
     """Generate LLM response about compatibility using LangChain."""
     if history is None:
@@ -422,10 +471,10 @@ def chat_about_compatibility(
             chat_history.append(AIMessage(content=msg["content"]))
     
     try:
-        # Invoke chain with LangChain
+        # Invoke chain with LangChain — pass insights into context
         response = compatibility_chain.invoke({
             "temporal_context": get_current_astrological_context(),
-            "compat_context": format_compatibility_context(result),
+            "compat_context": format_compatibility_context(result, insights=insights),
             "chat_history": chat_history,
             "question": question
         })

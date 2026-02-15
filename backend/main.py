@@ -185,12 +185,14 @@ class ChartChatRequest(BaseModel):
     chart: Dict[str, Any]
     question: str
     history: List[Dict[str, str]] = []
+    insights: Optional[str] = None
 
 
 class CompatibilityChatRequest(BaseModel):
     result: Dict[str, Any]
     question: str
     history: List[Dict[str, str]] = []
+    insights: Optional[str] = None
 
 
 @router.post("/chat/chart")
@@ -199,7 +201,7 @@ async def chat_chart(req: ChartChatRequest):
     try:
         t_start = time.time()
         from .llm_langchain import chat_about_chart
-        response = chat_about_chart(req.chart, req.question, req.history)
+        response = chat_about_chart(req.chart, req.question, req.history, insights=req.insights)
         t_end = time.time()
         print(f"⏱️  Chat: {round(t_end - t_start, 1)}s")
         return {"response": response, "timing": round(t_end - t_start, 1)}
@@ -214,7 +216,7 @@ async def chat_compatibility(req: CompatibilityChatRequest):
     """Chat about compatibility using LLM."""
     try:
         from .llm_langchain import chat_about_compatibility
-        response = chat_about_compatibility(req.result, req.question, req.history)
+        response = chat_about_compatibility(req.result, req.question, req.history, insights=req.insights)
         return {"response": response}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

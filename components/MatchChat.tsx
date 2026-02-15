@@ -67,6 +67,7 @@ export function MatchChat({ result }: MatchChatProps) {
                     result: result,
                     question: question,
                     history: formatHistory(),
+                    insights: result.insights,  // Send previously generated insights
                 }),
             });
 

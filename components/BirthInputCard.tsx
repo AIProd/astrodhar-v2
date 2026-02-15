@@ -45,20 +45,15 @@ export function BirthInputCard({
 
     // Auto-format time input (HH:MM)
     const handleTimeChange = (value: string) => {
-        // Remove non-digits except colon
         let cleaned = value.replace(/[^\d:]/g, "");
-
-        // Remove existing colons for processing
         const digits = cleaned.replace(/:/g, "");
 
-        // Format with colon after 2 digits
         let formatted = "";
         for (let i = 0; i < digits.length && i < 4; i++) {
             if (i === 2) formatted += ":";
             formatted += digits[i];
         }
 
-        // Validate hours (00-23) and minutes (00-59)
         const parts = formatted.split(":");
         if (parts[0] && parseInt(parts[0]) > 23) {
             formatted = "23" + (parts[1] ? ":" + parts[1] : "");
@@ -69,7 +64,6 @@ export function BirthInputCard({
 
         setTimeInput(formatted);
 
-        // Update parent if valid time
         if (formatted.length === 5 && formatted.includes(":")) {
             onChange({ ...data, time: formatted });
         }
@@ -82,6 +76,13 @@ export function BirthInputCard({
         }
     }, [data.time]);
 
+    // Sync city display
+    useEffect(() => {
+        if (data.city && !cityQuery) {
+            setCityQuery(data.city);
+        }
+    }, [data.city]);
+
     const updateField = <K extends keyof BirthInput>(
         field: K,
         value: BirthInput[K]
@@ -89,30 +90,31 @@ export function BirthInputCard({
         onChange({ ...data, [field]: value });
     };
 
-    // Handle city search - more forgiving, fewer chars needed
+    // Handle city search with debounced API call
     const handleCitySearch = (query: string) => {
         setCityQuery(query);
-        // Start search at 1 character for better UX
-        if (query.length >= 1) {
+        if (query.length >= 2) {
             setIsSearching(true);
             debouncedSearch(query, (results) => {
                 setSuggestions(results);
                 setShowSuggestions(true);
                 setIsSearching(false);
-            }, 200); // Reduced debounce for faster response
+            });
         } else {
             setSuggestions([]);
             setShowSuggestions(false);
+            setIsSearching(false);
         }
     };
 
-    // Handle city selection
+    // Handle city selection — auto-sets timezone
     const handleCitySelect = (result: GeocodingResult) => {
         onChange({
             ...data,
             city: result.display_name,
             lat: result.lat,
             lon: result.lon,
+            tz: result.tz || data.tz || "Asia/Kolkata",
         });
         setCityQuery(result.display_name);
         setShowSuggestions(false);
@@ -229,7 +231,7 @@ export function BirthInputCard({
                 {/* City Search with Autocomplete */}
                 <div className="relative" ref={suggestionRef}>
                     <label className="block text-[10px] md:text-xs font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1">
-                        City / Town / Village of Birth
+                        City / Town of Birth
                     </label>
                     <div className="relative group/input">
                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/50 text-lg group-focus-within/input:text-primary transition-colors z-10">
@@ -241,7 +243,7 @@ export function BirthInputCard({
                             onChange={(e) => handleCitySearch(e.target.value)}
                             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                             className="w-full bg-white/90 dark:bg-[#0a0518]/80 border border-primary/20 rounded-lg py-3 pl-10 pr-10 text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-primary/80 focus:border-primary/80 placeholder-gray-400 dark:placeholder-gray-500 transition-all shadow-inner"
-                            placeholder="Start typing city name..."
+                            placeholder="Search any city worldwide..."
                         />
                         {isSearching && (
                             <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/50 text-lg animate-spin">
@@ -250,7 +252,7 @@ export function BirthInputCard({
                         )}
                     </div>
 
-                    {/* Suggestions dropdown - proper dark/light mode */}
+                    {/* Suggestions dropdown */}
                     {showSuggestions && suggestions.length > 0 && (
                         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-[#1a0b2e] border border-primary/40 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                             {suggestions.map((result, index) => (
@@ -284,18 +286,18 @@ export function BirthInputCard({
                     {/* Show selected coordinates */}
                     {data.lat !== 0 && data.lon !== 0 && !showSuggestions && (
                         <p className="text-[10px] text-green-600 dark:text-green-400 mt-1 ml-1">
-                            ✓ Selected: {data.lat.toFixed(4)}°, {data.lon.toFixed(4)}°
+                            ✓ {data.lat.toFixed(4)}°, {data.lon.toFixed(4)}°
                         </p>
                     )}
                 </div>
 
-                {/* Timezone */}
+                {/* Timezone — auto-detected, can override */}
                 <div>
                     <label
                         htmlFor={`${label}-timezone`}
                         className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1.5 ml-1"
                     >
-                        Timezone
+                        Timezone {data.lat !== 0 && <span className="text-green-500 normal-case font-normal">(auto-detected)</span>}
                     </label>
                     <select
                         id={`${label}-timezone`}
@@ -305,14 +307,22 @@ export function BirthInputCard({
                     >
                         <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                         <option value="America/New_York">America/New_York (EST)</option>
+                        <option value="America/Chicago">America/Chicago (CST)</option>
                         <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
                         <option value="Europe/London">Europe/London (GMT)</option>
+                        <option value="Europe/Paris">Europe/Paris (CET)</option>
                         <option value="Asia/Dubai">Asia/Dubai (GST)</option>
                         <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
-                        <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
                         <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-                        <option value="Europe/Paris">Europe/Paris (CET)</option>
                         <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+                        <option value="Asia/Kathmandu">Asia/Kathmandu (NPT)</option>
+                        <option value="Asia/Dhaka">Asia/Dhaka (BST)</option>
+                        <option value="Asia/Colombo">Asia/Colombo (IST)</option>
+                        <option value="Asia/Karachi">Asia/Karachi (PKT)</option>
+                        <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
+                        <option value="America/Toronto">America/Toronto (EST)</option>
+                        <option value="America/Vancouver">America/Vancouver (PST)</option>
+                        <option value="UTC">UTC</option>
                     </select>
                 </div>
             </div>

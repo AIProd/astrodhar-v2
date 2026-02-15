@@ -13,7 +13,7 @@ interface ChatRequest {
 
 export async function POST(request: NextRequest) {
     try {
-        const { chart, question, history = [] }: ChatRequest = await request.json();
+        const { chart, question, history = [], insights }: ChatRequest & { insights?: string } = await request.json();
 
         if (!chart || !question) {
             return NextResponse.json(
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
                 chart: chart,
                 question: question,
                 history: history,
+                insights: insights,
             }),
         });
 

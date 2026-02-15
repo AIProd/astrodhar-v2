@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BirthInputCard } from "@/components/BirthInputCard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { DimensionCard } from "@/components/DimensionCard";
@@ -32,6 +32,14 @@ const testPartnerB = (): BirthInput => ({
     tz: "Asia/Kolkata",
 });
 
+const LOADING_PHASES = [
+    { message: "Casting both kundlis...", icon: "auto_awesome", delay: 0 },
+    { message: "Reading planetary positions...", icon: "public", delay: 3000 },
+    { message: "Comparing Guna scores...", icon: "compare", delay: 8000 },
+    { message: "Analyzing compatibility dimensions...", icon: "psychology", delay: 15000 },
+    { message: "Almost there — crafting your insights...", icon: "edit_note", delay: 25000 },
+];
+
 export default function TestMatchPage() {
     const [partnerA, setPartnerA] = useState<BirthInput>(testPartnerA());
     const [partnerB, setPartnerB] = useState<BirthInput>(testPartnerB());
@@ -39,15 +47,25 @@ export default function TestMatchPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showCharts, setShowCharts] = useState(false);
+    const [loadingPhase, setLoadingPhase] = useState(0);
+    const timersRef = useRef<NodeJS.Timeout[]>([]);
 
     // Automatically calculate compatibility on mount
     useEffect(() => {
         handleAnalyze();
+        return () => timersRef.current.forEach(clearTimeout);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleAnalyze = async () => {
         setLoading(true);
         setError(null);
+        setLoadingPhase(0);
+
+        // Set up phased loading messages
+        timersRef.current.forEach(clearTimeout);
+        timersRef.current = LOADING_PHASES.slice(1).map((phase, i) =>
+            setTimeout(() => setLoadingPhase(i + 1), phase.delay)
+        );
 
         try {
             const res = await fetch("/api/compatibility", {
@@ -67,8 +85,12 @@ export default function TestMatchPage() {
             setError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
             setLoading(false);
+            timersRef.current.forEach(clearTimeout);
+            timersRef.current = [];
         }
     };
+
+    const currentPhase = LOADING_PHASES[loadingPhase];
 
     return (
         <div className="min-h-screen pt-24 pb-16 px-4">
@@ -83,8 +105,8 @@ export default function TestMatchPage() {
                     </p>
                 </div>
 
-                {/* Input Cards */}
-                <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-8 mb-12">
+                {/* Input Cards — Mobile: stacked; Desktop: side by side with button in center */}
+                <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-8 mb-4 lg:mb-12">
                     <BirthInputCard
                         label="Partner A (Test)"
                         data={partnerA}
@@ -92,12 +114,12 @@ export default function TestMatchPage() {
                         position="left"
                     />
 
-                    {/* Analyze Button */}
-                    <div className="flex-shrink-0 relative z-10">
+                    {/* Desktop-only circular button between cards */}
+                    <div className="hidden lg:flex flex-shrink-0 relative z-10 flex-col items-center">
                         <button
                             onClick={handleAnalyze}
                             disabled={loading}
-                            className="group w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-primary via-gold-light to-primary border-4 border-primary/50 shadow-gold-glow hover:scale-110 transition-all duration-300 flex items-center justify-center gold-shimmer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="group w-28 h-28 rounded-full bg-gradient-to-br from-primary via-gold-light to-primary border-4 border-primary/50 shadow-gold-glow hover:scale-110 transition-all duration-300 flex items-center justify-center gold-shimmer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <span className="material-symbols-outlined text-4xl text-[#1a0b2e] animate-spin">
@@ -110,7 +132,7 @@ export default function TestMatchPage() {
                             )}
                         </button>
                         <p className="text-center mt-2 text-[10px] uppercase tracking-widest text-primary/60 font-bold">
-                            Analyze
+                            Compute
                         </p>
                     </div>
 
@@ -121,6 +143,52 @@ export default function TestMatchPage() {
                         position="right"
                     />
                 </div>
+
+                {/* Mobile-only compute button — full width, below both cards */}
+                <div className="lg:hidden flex flex-col items-center gap-4 mb-8 mt-4">
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={loading}
+                        className="group w-full max-w-md px-8 py-4 rounded-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] text-[#0a0518] text-lg font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(212,175,55,0.4)] hover:shadow-[0_4px_40px_rgba(212,175,55,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                    >
+                        {loading ? (
+                            <>
+                                <span className="material-symbols-outlined animate-spin">
+                                    progress_activity
+                                </span>
+                                Computing...
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined">auto_awesome</span>
+                                Compute Compatibility
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Phased Loading Indicator */}
+                {loading && (
+                    <div className="max-w-md mx-auto mb-8 glass-panel embossed-gold-border rounded-xl p-6 animate-fadeIn">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="material-symbols-outlined text-primary animate-pulse text-2xl">
+                                {currentPhase.icon}
+                            </span>
+                            <p className="text-gray-600 dark:text-gray-300 font-medium">
+                                {currentPhase.message}
+                            </p>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] rounded-full transition-all duration-1000 ease-out"
+                                style={{ width: `${Math.min(((loadingPhase + 1) / LOADING_PHASES.length) * 100, 95)}%` }}
+                            />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                            First time may take 15-30 seconds
+                        </p>
+                    </div>
+                )}
 
                 {/* Error display */}
                 {error && (

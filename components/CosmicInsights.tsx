@@ -47,13 +47,13 @@ export function CosmicInsights({ insights, loading }: CosmicInsightsProps) {
     const hasSections = parsed && parsed.sections.length > 1;
 
     return (
-        <div className="glass-panel embossed-gold-border rounded-xl p-8 mb-12 animate-fadeIn relative overflow-hidden">
+        <div className="glass-panel embossed-gold-border rounded-xl p-4 md:p-8 mb-6 md:mb-12 animate-fadeIn relative overflow-hidden">
             {/* Background elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
-            <div className="flex items-start gap-4 relative z-10">
-                <div className="p-3 bg-gradient-to-br from-[#aa8220] to-[#d4af37] rounded-full shadow-lg shadow-gold/20 flex-shrink-0">
-                    <span className="material-symbols-outlined text-[#0a0518] text-2xl">
+            <div className="flex items-start gap-3 md:gap-4 relative z-10">
+                <div className="p-2 md:p-3 bg-gradient-to-br from-[#aa8220] to-[#d4af37] rounded-full shadow-lg shadow-gold/20 flex-shrink-0">
+                    <span className="material-symbols-outlined text-[#0a0518] text-lg md:text-2xl">
                         auto_awesome
                     </span>
                 </div>

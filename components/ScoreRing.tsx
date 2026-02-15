@@ -24,7 +24,7 @@ export function ScoreRing({ score, maxScore, label }: ScoreRingProps) {
     const colors = getScoreColor();
 
     return (
-        <div className="relative w-72 h-72 md:w-96 md:h-96 flex items-center justify-center">
+        <div className="relative w-48 h-48 md:w-72 md:h-72 flex items-center justify-center">
             {/* Glow background */}
             <div
                 className="absolute inset-0 rounded-full blur-3xl animate-pulse"
@@ -86,10 +86,10 @@ export function ScoreRing({ score, maxScore, label }: ScoreRingProps) {
             {/* Center content */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10 text-center">
                 <div className="flex items-baseline relative">
-                    <span className="font-serif text-6xl md:text-7xl font-bold text-gold-3d drop-shadow-2xl">
+                    <span className="font-serif text-4xl md:text-6xl font-bold text-gold-3d drop-shadow-2xl">
                         {score}
                     </span>
-                    <span className="text-2xl md:text-3xl text-primary/40 font-light ml-1 font-serif">
+                    <span className="text-lg md:text-2xl text-primary/40 font-light ml-1 font-serif">
                         /{maxScore}
                     </span>
                 </div>

@@ -11,6 +11,7 @@ interface Message {
 
 interface MatchChatProps {
     result: CompatibilityResponse;
+    insights?: string;
 }
 
 const MAX_CONVERSATION_PAIRS = 10;
@@ -23,7 +24,7 @@ const STARTER_QUESTIONS = [
     "When is the best time for our wedding?",
 ];
 
-export function MatchChat({ result }: MatchChatProps) {
+export function MatchChat({ result, insights: externalInsights }: MatchChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -67,7 +68,7 @@ export function MatchChat({ result }: MatchChatProps) {
                     result: result,
                     question: question,
                     history: formatHistory(),
-                    insights: result.insights,  // Send previously generated insights
+                    insights: externalInsights || result.insights,  // Send previously generated insights
                 }),
             });
 

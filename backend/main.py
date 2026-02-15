@@ -93,7 +93,7 @@ async def health_check():
 
 @router.post("/chart")
 async def calculate_chart(req: ChartRequest):
-    """Calculate a single Vedic birth chart."""
+    """Calculate a single Vedic birth chart (fast, no LLM)."""
     try:
         t_start = time.time()
         birth = _to_birth_input(req.birth)
@@ -102,26 +102,11 @@ async def calculate_chart(req: ChartRequest):
             high_precision=req.high_precision,
             use_true_node=req.use_true_node,
         )
-        t_chart = time.time()
+        t_end = time.time()
         
         response = chart.to_dict()
-        
-        # Generate LLM insights (graceful fallback if timeout)
-        try:
-            from .llm_langchain import generate_chart_insights
-            insights = generate_chart_insights(chart.to_dict())
-            response["insights"] = insights
-        except Exception as llm_error:
-            # LLM failed/timed out - continue with chart data only
-            print(f"⚠️  LLM insights generation failed (continuing without insights): {llm_error}")
-            response["insights"] = "Chart calculated successfully. AI insights temporarily unavailable — please try refreshing."
-        
-        t_end = time.time()
-        chart_time = round(t_chart - t_start, 1)
-        llm_time = round(t_end - t_chart, 1)
-        total_time = round(t_end - t_start, 1)
-        print(f"⏱️  Chart: {chart_time}s | LLM: {llm_time}s | Total: {total_time}s")
-        response["timing"] = {"chart": chart_time, "llm": llm_time, "total": total_time}
+        response["timing"] = {"chart": round(t_end - t_start, 1)}
+        print(f"⏱️  Chart: {round(t_end - t_start, 1)}s")
         
         return response
         
@@ -133,7 +118,7 @@ async def calculate_chart(req: ChartRequest):
 
 @router.post("/compatibility")
 async def calculate_compatibility(req: CompatibilityRequest):
-    """Calculate compatibility indicators and Guna matching between two charts."""
+    """Calculate compatibility indicators and Guna matching (fast, no LLM)."""
     try:
         t_start = time.time()
         birth_a = _to_birth_input(req.partnerA)
@@ -145,7 +130,7 @@ async def calculate_compatibility(req: CompatibilityRequest):
         # Calculate both indicator-based and traditional Guna matching
         indicators = compatibility_indicators(chart_a, chart_b)
         guna = calculate_guna_milan(chart_a, chart_b)
-        t_chart = time.time()
+        t_end = time.time()
         
         result = {
             "charts": {
@@ -154,24 +139,9 @@ async def calculate_compatibility(req: CompatibilityRequest):
             },
             "compatibility": indicators.to_dict(),
             "guna": guna.to_dict(),
+            "timing": {"chart": round(t_end - t_start, 1)},
         }
-
-        # Generate LLM insights (graceful fallback if timeout)
-        try:
-            from .llm_langchain import generate_compatibility_insights
-            insights = generate_compatibility_insights(result)
-            result["insights"] = insights
-        except Exception as llm_error:
-            # LLM failed/timed out - continue with chart data only
-            print(f"⚠️  LLM insights generation failed (continuing without insights): {llm_error}")
-            result["insights"] = "Charts calculated successfully. AI insights temporarily unavailable — please try refreshing."
-        
-        t_end = time.time()
-        chart_time = round(t_chart - t_start, 1)
-        llm_time = round(t_end - t_chart, 1)
-        total_time = round(t_end - t_start, 1)
-        print(f"⏱️  Compat Chart: {chart_time}s | LLM: {llm_time}s | Total: {total_time}s")
-        result["timing"] = {"chart": chart_time, "llm": llm_time, "total": total_time}
+        print(f"⏱️  Compat: {round(t_end - t_start, 1)}s")
         
         return result
         

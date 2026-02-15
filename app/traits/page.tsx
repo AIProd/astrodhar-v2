@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { BirthInputCard } from "@/components/BirthInputCard";
 import { ChartCard } from "@/components/ChartCard";
 import { TraitsChat } from "@/components/TraitsChat";
 import { CosmicInsights } from "@/components/CosmicInsights";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { BirthInput, VedicChart } from "@/lib/types";
 
 const defaultBirth = (): BirthInput => ({
@@ -17,31 +18,20 @@ const defaultBirth = (): BirthInput => ({
     city: "",
 });
 
-const LOADING_PHASES = [
-    { message: "Casting your kundli...", icon: "auto_awesome", delay: 0 },
-    { message: "Reading planetary positions...", icon: "public", delay: 3000 },
-    { message: "Analyzing your dashas...", icon: "timeline", delay: 8000 },
-    { message: "Channeling cosmic wisdom...", icon: "psychology", delay: 15000 },
-    { message: "Almost there — crafting your insights...", icon: "edit_note", delay: 25000 },
-];
-
 export default function TraitsPage() {
     const [birthData, setBirthData] = useState<BirthInput>(defaultBirth());
     const [chart, setChart] = useState<VedicChart | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [showChart, setShowChart] = useState(false);
-    const [loadingPhase, setLoadingPhase] = useState(0);
-    const timersRef = useRef<NodeJS.Timeout[]>([]);
+
+    // Phase 2: AI Insights
+    const [insights, setInsights] = useState<string | null>(null);
+    const [insightsLoading, setInsightsLoading] = useState(false);
 
     const isValid = (b: BirthInput) =>
         b.name.trim() && b.date && b.time && b.lat !== 0 && b.lon !== 0;
 
-    // Cleanup timers on unmount
-    useEffect(() => {
-        return () => timersRef.current.forEach(clearTimeout);
-    }, []);
-
+    // Phase 1: Fast chart (no LLM)
     const handleCompute = async () => {
         if (!isValid(birthData)) {
             setError("Please fill in all fields including city selection.");
@@ -50,13 +40,7 @@ export default function TraitsPage() {
 
         setLoading(true);
         setError(null);
-        setLoadingPhase(0);
-
-        // Set up phased loading messages
-        timersRef.current.forEach(clearTimeout);
-        timersRef.current = LOADING_PHASES.slice(1).map((phase, i) =>
-            setTimeout(() => setLoadingPhase(i + 1), phase.delay)
-        );
+        setInsights(null);
 
         try {
             const res = await fetch("/api/chart", {
@@ -76,24 +60,40 @@ export default function TraitsPage() {
             setError(err instanceof Error ? err.message : "Something went wrong");
         } finally {
             setLoading(false);
-            timersRef.current.forEach(clearTimeout);
-            timersRef.current = [];
         }
     };
 
-    const currentPhase = LOADING_PHASES[loadingPhase];
+    // Phase 2: Generate AI insights separately
+    const handleGenerateInsights = async () => {
+        setInsightsLoading(true);
+        try {
+            const res = await fetch("/api/insights/chart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ birth: birthData }),
+            });
+
+            if (!res.ok) throw new Error("Failed to generate insights");
+
+            const data = await res.json();
+            setInsights(data.insights || "");
+        } catch (err) {
+            setInsights("AI insights temporarily unavailable. Please try again.");
+        } finally {
+            setInsightsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen pt-24 pb-16 px-4">
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
-                <div className="text-center mb-12">
-                    <h1 className="font-serif text-4xl md:text-5xl text-[#8b6914] dark:text-gold-light mb-4">
+                <div className="text-center mb-8 md:mb-12">
+                    <h1 className="font-serif text-3xl md:text-5xl text-[#8b6914] dark:text-gold-light mb-3">
                         Personal Traits
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-                        Compute your Vedic birth chart and explore your cosmic personality
-                        through AI-powered insights.
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+                        Compute your Vedic birth chart and explore your cosmic personality.
                     </p>
                 </div>
 
@@ -107,17 +107,14 @@ export default function TraitsPage() {
                             position="center"
                         />
 
-                        {/* Compute Button */}
                         <button
                             onClick={handleCompute}
                             disabled={loading}
-                            className="group px-8 py-4 rounded-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] text-[#0a0518] text-lg font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(212,175,55,0.4)] hover:shadow-[0_4px_40px_rgba(212,175,55,0.6)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                            className="group px-8 py-4 rounded-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] text-[#0a0518] text-lg font-bold uppercase tracking-wider hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(212,175,55,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
                         >
                             {loading ? (
                                 <>
-                                    <span className="material-symbols-outlined animate-spin">
-                                        progress_activity
-                                    </span>
+                                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
                                     Computing...
                                 </>
                             ) : (
@@ -128,92 +125,81 @@ export default function TraitsPage() {
                             )}
                         </button>
 
-                        {/* Phased Loading Indicator */}
+                        {/* Simple loading (Phase 1 is fast) */}
                         {loading && (
-                            <div className="glass-panel embossed-gold-border rounded-xl p-6 max-w-md w-full animate-fadeIn">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className="material-symbols-outlined text-primary animate-pulse text-2xl">
-                                        {currentPhase.icon}
-                                    </span>
-                                    <p className="text-gray-300 font-medium">
-                                        {currentPhase.message}
-                                    </p>
+                            <div className="glass-panel embossed-gold-border rounded-xl p-5 max-w-md w-full animate-fadeIn text-center">
+                                <div className="flex items-center justify-center gap-3 mb-2">
+                                    <span className="material-symbols-outlined text-primary animate-spin text-2xl">progress_activity</span>
+                                    <p className="text-gray-600 dark:text-gray-300 font-medium">Casting your kundli...</p>
                                 </div>
-                                {/* Progress bar */}
-                                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                                    <div
-                                        className="h-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] rounded-full transition-all duration-1000 ease-out"
-                                        style={{ width: `${Math.min(((loadingPhase + 1) / LOADING_PHASES.length) * 100, 95)}%` }}
-                                    />
-                                </div>
-                                <p className="text-xs text-gray-500 mt-2 text-center">
-                                    First time may take 15-30 seconds
-                                </p>
+                                <p className="text-xs text-gray-500">Usually takes 2-5 seconds</p>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* Error display */}
+                {/* Error */}
                 {error && (
                     <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300 text-center">
-                        <span className="material-symbols-outlined align-middle mr-2">
-                            error
-                        </span>
+                        <span className="material-symbols-outlined align-middle mr-2">error</span>
                         {error}
                     </div>
                 )}
 
-                {/* Results Section */}
+                {/* ═══ Results ═══ */}
                 {chart && (
-                    <div className="space-y-8 animate-fadeIn">
+                    <div className="space-y-4 md:space-y-6 animate-fadeIn">
                         {/* Summary Header */}
-                        <div className="glass-panel embossed-gold-border rounded-xl p-6 text-center">
-                            <h2 className="font-serif text-2xl text-[#8b6914] dark:text-[#fce288] mb-2">
+                        <div className="glass-panel embossed-gold-border rounded-xl p-4 md:p-6 text-center">
+                            <h2 className="font-serif text-xl md:text-2xl text-[#8b6914] dark:text-[#fce288] mb-2">
                                 Welcome, {chart.name || "Seeker"}
                             </h2>
-                            <p className="text-gray-400">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="text-primary">{chart.moon.nakshatra}</span> Nakshatra
                                 • <span className="text-primary">{chart.ascendant.sign}</span> Ascendant
                             </p>
                             <button
-                                onClick={() => {
-                                    setChart(null);
-                                    setBirthData(defaultBirth());
-                                }}
-                                className="mt-4 text-sm text-primary/60 hover:text-primary underline"
+                                onClick={() => { setChart(null); setInsights(null); }}
+                                className="mt-3 text-sm text-primary/60 hover:text-primary underline"
                             >
                                 ← Enter different details
                             </button>
                         </div>
 
-                        {/* Cosmic Insights */}
-                        <div className="max-w-4xl mx-auto">
-                            <CosmicInsights insights={chart.insights} />
-                        </div>
-
-                        {/* Toggle Chart */}
-                        <div className="flex justify-center">
-                            <button
-                                onClick={() => setShowChart(!showChart)}
-                                className="px-6 py-2 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined">
-                                    {showChart ? "visibility_off" : "visibility"}
-                                </span>
-                                {showChart ? "Hide" : "Show"} Full Chart
-                            </button>
-                        </div>
-
-                        {/* Chart Display */}
-                        {showChart && (
+                        {/* ── Birth Chart ── */}
+                        <CollapsibleSection title="Your Birth Chart" icon="public" defaultOpen={true}>
                             <div className="max-w-2xl mx-auto">
                                 <ChartCard chart={chart} label="Your Birth Chart" />
                             </div>
-                        )}
+                        </CollapsibleSection>
 
-                        {/* AI Chat */}
-                        <TraitsChat chart={chart} insights={chart.insights} />
+                        {/* ── AI Insights (Phase 2) ── */}
+                        <CollapsibleSection title="AI Cosmic Insights" icon="auto_awesome" defaultOpen={!!insights}>
+                            {insights ? (
+                                <CosmicInsights insights={insights} />
+                            ) : insightsLoading ? (
+                                <CosmicInsights loading={true} />
+                            ) : (
+                                <div className="text-center py-6">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                        Get personalized AI-powered insights based on your Vedic chart.
+                                    </p>
+                                    <button
+                                        onClick={handleGenerateInsights}
+                                        className="px-6 py-3 rounded-full bg-gradient-to-r from-[#aa8220] to-[#d4af37] text-[#0a0518] font-bold uppercase tracking-wider text-sm hover:brightness-110 transition-all shadow-[0_4px_20px_rgba(212,175,55,0.3)] flex items-center gap-2 mx-auto"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                        Generate AI Insights
+                                    </button>
+                                    <p className="text-xs text-gray-500 mt-2">Takes 15-30 seconds</p>
+                                </div>
+                            )}
+                        </CollapsibleSection>
+
+                        {/* ── Chat ── */}
+                        <CollapsibleSection title="Ask About Your Chart" icon="chat">
+                            <TraitsChat chart={chart} insights={insights || chart.insights} />
+                        </CollapsibleSection>
                     </div>
                 )}
             </div>
